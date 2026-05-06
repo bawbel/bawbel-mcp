@@ -1,0 +1,54 @@
+[build-system]
+requires      = ["setuptools>=70"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name        = "bawbel-mcp"
+version     = "1.0.0"
+description = "MCP server exposing Bawbel Scanner as agent-callable security tools"
+readme      = "README.md"
+license     = { text = "Apache-2.0" }
+requires-python = ">=3.10"
+
+authors = [
+    { name = "Bawbel", email = "bawbel.io@gmail.com" },
+]
+
+keywords = [
+    "mcp", "security", "scanner", "ave", "agentic-ai",
+    "prompt-injection", "vulnerability", "devsecops",
+]
+
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: Software Development :: Quality Assurance",
+]
+
+dependencies = [
+    "fastmcp>=3.0.0",
+    "bawbel-scanner>=1.1.1",
+]
+
+[project.optional-dependencies]
+all = [
+    "bawbel-scanner[all]>=1.1.1",
+]
+
+[project.urls]
+Homepage      = "https://bawbel.io"
+Repository    = "https://github.com/bawbel/bawbel-mcp"
+Documentation = "https://bawbel.io/docs"
+"Threat Intel" = "https://api.piranha.bawbel.io"
+
+[project.scripts]
+bawbel-mcp = "server:mcp.run"
+
+[tool.setuptools.packages.find]
+where   = ["."]
+include = ["server*"]
