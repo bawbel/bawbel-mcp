@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name        = "bawbel-mcp"
-version     = "1.0.0"
+version     = "1.0.1"
 description = "MCP server exposing Bawbel Scanner as agent-callable security tools"
 readme      = "README.md"
 license     = { text = "Apache-2.0" }
@@ -41,14 +41,14 @@ all = [
 ]
 
 [project.urls]
-Homepage      = "https://bawbel.io"
-Repository    = "https://github.com/bawbel/bawbel-mcp"
-Documentation = "https://bawbel.io/docs"
+Homepage       = "https://bawbel.io"
+Repository     = "https://github.com/bawbel/bawbel-mcp"
+Documentation  = "https://bawbel.io/docs"
 "Threat Intel" = "https://api.piranha.bawbel.io"
 
 [project.scripts]
-bawbel-mcp = "server:mcp.run"
+bawbel-mcp = "bawbel_mcp.server:main"
 
 [tool.setuptools.packages.find]
 where   = ["."]
-include = ["server*"]
+include = ["bawbel_mcp*"]
