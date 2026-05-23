@@ -3,7 +3,7 @@
   "name": "io.github.bawbel/bawbel-mcp",
   "title": "Bawbel Scanner",
   "description": "Scan MCP servers and skill files for AVE vulnerabilities. Conformance scoring and threat intel.",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "repository": {
     "url": "https://github.com/bawbel/bawbel-mcp",
     "source": "github"
