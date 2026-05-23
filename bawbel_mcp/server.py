@@ -2,17 +2,21 @@
 Bawbel MCP Server
 
 Exposes Bawbel Scanner functionality as MCP tools so any agent
-can scan MCP servers, check skill files, score conformance, and
-query the AVE threat intelligence database mid-conversation.
+can scan MCP servers, check skill files, score conformance, query
+the AVE threat intelligence database, and manage justified suppressions
+mid-conversation.
 
 Tools:
-    scan_content: scan raw content or a file path
-    scan_server_card: fetch and scan an MCP server-card URL
-    check_conformance: score an MCP server manifest against the spec
-    lookup_ave: get a full AVE record by ID
-    search_ave: search AVE records by keyword
-    list_ave: list all AVE records with optional filters
-    check_pins: detect rug pull drift in a directory
+    scan_content        scan raw content or a file path
+    scan_server_card    fetch and scan an MCP server-card URL
+    scan_creds          credential-focused scan (AVE-2026-00047 and related)
+    scan_chain          delegation chain scan (AVE-2026-00048 and related)
+    check_conformance   score an MCP server manifest against the spec
+    accept_finding      insert a justified suppression into a skill file
+    lookup_ave          get a full AVE record by ID
+    search_ave          search AVE records by keyword
+    list_ave            list all AVE records with optional filters
+    check_pins          detect rug pull drift in a directory
 
 Usage:
     # stdio (Claude Desktop, Claude Code)
@@ -40,6 +44,7 @@ mcp = FastMCP(
         "Use scan_server_card before connecting to any MCP server. "
         "Use scan_content to check skill files or system prompts. "
         "Use check_conformance to verify a server follows the MCP spec. "
+        "Use accept_finding to suppress false positives with a justified reason. "
         "Use lookup_ave or search_ave to query the AVE threat intelligence database."
     ),
 )
@@ -76,7 +81,6 @@ def _run_bawbel(args: list[str], input_file: Optional[str] = None) -> dict:
                 "risk_score": 0,
             }
 
-        # JSON output is a list of file results
         start = raw.find("[")
         if start < 0:
             return {"error": raw[:300], "findings": [], "toxic_flows": [], "risk_score": 0}
@@ -107,7 +111,7 @@ def _fetch_url(url: str) -> tuple[Optional[str], Optional[str]]:
     try:
         req = urllib.request.Request(
             url,
-            headers={"User-Agent": "bawbel-mcp/1.0 (https://bawbel.io)"},
+            headers={"User-Agent": "bawbel-mcp/1.1 (https://bawbel.io)"},
         )
         with urllib.request.urlopen(req, timeout=10) as r:  # nosec B310  # noqa: S310
             return r.read(MAX_CONTENT_BYTES).decode("utf-8", errors="replace"), None
@@ -131,44 +135,73 @@ def _piranha_get(path: str) -> dict:
         return {"error": "Invalid response from PiranhaDB"}
 
 
-def _format_scan_result(result: dict) -> str:
-    """Format scan result for human-readable MCP response."""
+def _format_finding(f: dict) -> list[str]:
+    """Format a single finding into display lines."""
+    lines = []
+    sev = f.get("severity", "?")
+    ave_id = f.get("ave_id", "")
+    title = f.get("title", "")
+    line_no = f.get("line")
+    aivss = f.get("aivss_score", 0)
+    owasp_mcp = ", ".join(f.get("owasp_mcp", []))
+    engine = f.get("engine", "")
+    match = f.get("match", "")
+
+    lines.append(f"[{sev}] {ave_id}  {title}  AIVSS {aivss:.1f}")
+    if line_no:
+        lines.append(f"  Line {line_no}: {match[:80]}" if match else f"  Line {line_no}")
+    if engine:
+        lines.append(f"  Engine: {engine}")
+    if owasp_mcp:
+        lines.append(f"  OWASP MCP: {owasp_mcp}")
+    lines.append(f"  Details: {PIRANHA_API}/records/{ave_id}")
+    return lines
+
+
+def _format_scan_result(result: dict, show_suppressed: bool = False) -> str:
+    """Format a full scan result for human-readable MCP response."""
     if result.get("error"):
         return f"Error: {result['error']}"
 
     findings = result.get("findings", [])
     toxic_flows = result.get("toxic_flows", [])
+    suppressed = result.get("suppressed_findings", [])
+    accepted = result.get("accepted_findings", [])
     risk_score = result.get("risk_score", 0)
-    max_severity = result.get("max_severity", "NONE")
+    max_severity = result.get("max_severity")
 
     lines = []
 
     if not findings and not toxic_flows:
         lines.append("Clean: no findings detected.")
         lines.append(f"Risk score: {risk_score:.1f}/10")
+        if suppressed:
+            lines.append(
+                f"Note: {len(suppressed)} finding(s) suppressed "
+                "(run scan with no_ignore=True to see all)"
+            )
+        if accepted:
+            lines.append(
+                f"Note: {len(accepted)} accepted risk(s) on file "
+                "(justified suppression active)"
+            )
         return "\n".join(lines)
 
-    lines.append(f"Risk score: {risk_score:.1f}/10  ({max_severity})")
-    lines.append(f"Findings: {len(findings)}  Toxic flows: {len(toxic_flows)}")
+    sev_label = max_severity if max_severity else "UNKNOWN"
+    lines.append(f"Risk score: {risk_score:.1f}/10  ({sev_label})")
+    lines.append(
+        f"Findings: {len(findings)}  "
+        f"Toxic flows: {len(toxic_flows)}  "
+        f"Suppressed: {len(suppressed)}  "
+        f"Accepted: {len(accepted)}"
+    )
     lines.append("")
 
     if findings:
         lines.append("FINDINGS")
         lines.append("-" * 50)
         for f in findings:
-            sev = f.get("severity", "?")
-            ave_id = f.get("ave_id", "")
-            title = f.get("title", "")
-            line_no = f.get("line_number")
-            owasp_mcp = ", ".join(f.get("owasp_mcp", []))
-            lines.append(f"[{sev}] {ave_id}  {title}")
-            if line_no:
-                lines.append(f"  Line {line_no}")
-            if owasp_mcp:
-                lines.append(f"  OWASP MCP: {owasp_mcp}")
-            lines.append(
-                f"  Details: {PIRANHA_API}/records/{ave_id}"
-            )
+            lines.extend(_format_finding(f))
             lines.append("")
 
     if toxic_flows:
@@ -176,12 +209,42 @@ def _format_scan_result(result: dict) -> str:
         lines.append("-" * 50)
         for flow in toxic_flows:
             title = flow.get("title", "")
-            cvss = flow.get("cvss_ai", 0)
-            caps = " + ".join(flow.get("capabilities", []))
+            aivss = flow.get("aivss_score", 0)
+            chain = flow.get("chain", "")
             ave_ids = ", ".join(flow.get("ave_ids", []))
-            lines.append(f"⛓  CRITICAL {cvss}  {title}")
-            lines.append(f"  Chain: {caps}")
-            lines.append(f"  AVEs: {ave_ids}")
+            owasp_mcp = ", ".join(flow.get("owasp_mcp", []))
+            lines.append(f"CRITICAL  {aivss:.1f}  {title}")
+            if chain:
+                lines.append(f"  Chain: {chain}")
+            if ave_ids:
+                lines.append(f"  AVEs: {ave_ids}")
+            if owasp_mcp:
+                lines.append(f"  OWASP MCP: {owasp_mcp}")
+            lines.append("")
+
+    if accepted:
+        lines.append("ACCEPTED RISKS (justified suppressions active)")
+        lines.append("-" * 50)
+        for af in accepted:
+            ave_id = af.get("ave_id", "")
+            reason = af.get("reason", "")
+            reviewer = af.get("reviewer", "")
+            expires = af.get("expires_at", "")
+            is_expired = af.get("is_expired", False)
+            expiry_note = " [EXPIRED - finding resurfaced]" if is_expired else (
+                f" (expires {expires})" if expires else ""
+            )
+            lines.append(f"  {ave_id}: {reason} - reviewed by {reviewer}{expiry_note}")
+        lines.append("")
+
+    if show_suppressed and suppressed:
+        lines.append("SUPPRESSED FINDINGS")
+        lines.append("-" * 50)
+        for f in suppressed:
+            reason = f.get("suppression_reason", "")
+            lines.extend(_format_finding(f))
+            if reason:
+                lines.append(f"  Suppressed: {reason}")
             lines.append("")
 
     return "\n".join(lines)
@@ -194,6 +257,7 @@ def _format_scan_result(result: dict) -> str:
 def scan_content(
     content: str,
     label: str = "submitted-content",
+    no_ignore: bool = False,
 ) -> str:
     """
     Scan raw text content for AVE security vulnerabilities.
@@ -201,13 +265,14 @@ def scan_content(
     Use this to check skill file content, system prompts, MCP tool
     descriptions, or any agentic AI component before using it.
 
-    Returns findings with AVE IDs, severity, OWASP MCP categories,
-    and links to full remediation guidance. Also detects toxic flows
-    where two findings combine into a complete attack chain.
+    Returns findings with AVE IDs, AIVSS severity scores, OWASP MCP
+    categories, and links to full remediation guidance. Also detects
+    toxic flows where two findings combine into a complete attack chain.
 
     Args:
-        content: The text content to scan (skill file, system prompt, etc.)
-        label:   Optional label for the content in the output (default: submitted-content)
+        content:   The text content to scan (skill file, system prompt, etc.)
+        label:     Optional label for the content in the output
+        no_ignore: If True, bypass all suppressions and show every finding
     """
     if not content or not content.strip():
         return "Error: content is empty"
@@ -217,13 +282,16 @@ def scan_content(
 
     with tempfile.NamedTemporaryFile(
         mode="w", suffix=".md", prefix="bawbel_mcp_",
-        delete=False, encoding="utf-8"
+        delete=False, encoding="utf-8",
     ) as f:
         f.write(content)
         tmp_path = f.name
 
     try:
-        result = _run_bawbel(["scan"], input_file=tmp_path)
+        args = ["scan"]
+        if no_ignore:
+            args.append("--no-ignore")
+        result = _run_bawbel(args, input_file=tmp_path)
     finally:
         Path(tmp_path).unlink(missing_ok=True)
 
@@ -231,7 +299,7 @@ def scan_content(
 
 
 @mcp.tool()
-async def scan_server_card(url: str) -> str:
+def scan_server_card(url: str, no_ignore: bool = False) -> str:
     """
     Fetch and scan an MCP server-card for security vulnerabilities.
 
@@ -244,37 +312,38 @@ async def scan_server_card(url: str) -> str:
     instructions at the discovery layer, before any tool call is made.
 
     Args:
-        url: Base URL of the MCP server (e.g. https://api.example.com)
+        url:       Base URL of the MCP server (e.g. https://api.example.com)
+        no_ignore: If True, bypass all suppressions and show every finding
     """
     if not url.startswith(("http://", "https://")):
         return "Error: URL must start with http:// or https://"
 
-    # Try server-card path first, then fall back to direct URL
     server_card_url = url.rstrip("/") + "/.well-known/mcp.json"
     content, err = _fetch_url(server_card_url)
 
     if not content:
-        # Try direct URL (might be a direct link to mcp.json)
         content, err = _fetch_url(url)
         if not content:
             return f"Error: Could not fetch server-card from {server_card_url}\n{err}"
 
     with tempfile.NamedTemporaryFile(
         mode="w", suffix=".json", prefix="bawbel_mcp_ssc_",
-        delete=False, encoding="utf-8"
+        delete=False, encoding="utf-8",
     ) as f:
         f.write(content)
         tmp_path = f.name
 
     try:
-        result = _run_bawbel(["scan"], input_file=tmp_path)
+        args = ["scan"]
+        if no_ignore:
+            args.append("--no-ignore")
+        result = _run_bawbel(args, input_file=tmp_path)
     finally:
         Path(tmp_path).unlink(missing_ok=True)
 
     output = [f"Server-card scan: {server_card_url}", ""]
     output.append(_format_scan_result(result))
 
-    # Suggest conformance check
     if not result.get("error"):
         output.append("")
         output.append(
@@ -286,13 +355,162 @@ async def scan_server_card(url: str) -> str:
 
 
 @mcp.tool()
+def scan_creds(content: str, no_ignore: bool = False) -> str:
+    """
+    Credential-focused scan of skill file content.
+
+    Filters to AVE-2026-00047 (hardcoded credentials) and related
+    rules only. Detects API keys, tokens, passwords, private keys,
+    and URL-embedded credentials.
+
+    Use this when you specifically want to check whether a skill file
+    contains hardcoded secrets before adding it to your agent config.
+
+    Args:
+        content:   The text content to scan
+        no_ignore: If True, bypass all suppressions
+    """
+    if not content or not content.strip():
+        return "Error: content is empty"
+
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".md", prefix="bawbel_mcp_creds_",
+        delete=False, encoding="utf-8",
+    ) as f:
+        f.write(content)
+        tmp_path = f.name
+
+    try:
+        args = ["creds"]
+        if no_ignore:
+            args.append("--no-ignore")
+        result = _run_bawbel(args, input_file=tmp_path)
+    finally:
+        Path(tmp_path).unlink(missing_ok=True)
+
+    return _format_scan_result(result)
+
+
+@mcp.tool()
+def scan_chain(content: str, no_ignore: bool = False) -> str:
+    """
+    Delegation chain scan of skill file content.
+
+    Filters to AVE-2026-00048 (unsafe agent delegation) and related
+    rules. Detects sub-agent spawning with inherited permissions and
+    missing trust boundaries.
+
+    Use this when evaluating a skill that spawns sub-agents or
+    delegates tasks to other agents.
+
+    Args:
+        content:   The text content to scan
+        no_ignore: If True, bypass all suppressions
+    """
+    if not content or not content.strip():
+        return "Error: content is empty"
+
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".md", prefix="bawbel_mcp_chain_",
+        delete=False, encoding="utf-8",
+    ) as f:
+        f.write(content)
+        tmp_path = f.name
+
+    try:
+        args = ["chain"]
+        if no_ignore:
+            args.append("--no-ignore")
+        result = _run_bawbel(args, input_file=tmp_path)
+    finally:
+        Path(tmp_path).unlink(missing_ok=True)
+
+    return _format_scan_result(result)
+
+
+@mcp.tool()
+def accept_finding(
+    ave_id: str,
+    file_path: str,
+    line: int,
+    reason: str,
+    reviewer: str,
+    acceptance_type: str = "false-positive",
+    expires_days: Optional[int] = None,
+) -> str:
+    """
+    Insert a justified suppression comment into a skill file.
+
+    Marks a finding as a false positive or accepted risk with a
+    documented reason, reviewer, and optional expiry date. The
+    suppression is written directly into the file as a structured
+    comment that lives in version control and shows up in PR reviews.
+
+    Accepted risks with an expiry date automatically resurface as
+    active findings on the next scan after the expiry date passes.
+
+    Args:
+        ave_id:          AVE ID to suppress (e.g. AVE-2026-00001)
+        file_path:       Absolute or relative path to the skill file
+        line:            Line number of the finding to suppress
+        reason:          Why this finding is a false positive or accepted risk
+        reviewer:        Your GitHub handle or name
+        acceptance_type: "false-positive" (permanent) or "accepted-risk" (with expiry)
+        expires_days:    Days until the accepted risk expires (required for accepted-risk)
+    """
+    if not Path(file_path).exists():
+        return f"Error: file not found: {file_path}"
+
+    if acceptance_type not in ("false-positive", "accepted-risk"):
+        return "Error: acceptance_type must be 'false-positive' or 'accepted-risk'"
+
+    if acceptance_type == "accepted-risk" and not expires_days:
+        return "Error: expires_days is required for accepted-risk type"
+
+    cmd = [
+        "bawbel", "accept", ave_id, file_path,
+        "--line", str(line),
+        "--reason", reason,
+        "--reviewer", reviewer,
+        "--type", acceptance_type,
+    ]
+
+    if expires_days:
+        cmd.extend(["--expires", f"{expires_days}d"])
+
+    try:
+        result = subprocess.run(  # nosec B603  # noqa: S603
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode != 0:
+            return f"Error: {result.stderr.strip() or result.stdout.strip()}"
+
+        return (
+            f"Accepted: {ave_id} on line {line} of {file_path}\n"
+            f"Type: {acceptance_type}\n"
+            f"Reason: {reason}\n"
+            f"Reviewer: {reviewer}\n"
+            + (f"Expires: {expires_days} days from today\n" if expires_days else "")
+            + "\nThe suppression comment has been written into the file. "
+            "Commit this change so the approval is tracked in version control."
+        )
+    except subprocess.TimeoutExpired:
+        return "Error: accept command timed out"
+    except FileNotFoundError:
+        return "Error: bawbel CLI not found. Install with: pip install bawbel-scanner"
+
+
+@mcp.tool()
 def check_conformance(url_or_path: str) -> str:
     """
     Score an MCP server manifest against the MCP specification.
 
     Runs 18 checks across 3 tiers (REQUIRED, RECOMMENDED, BEST PRACTICE)
     and returns a grade from A+ to F. A server is conformant when all
-    REQUIRED checks pass. Grade F means at least one REQUIRED check failed.
+    REQUIRED checks pass.
 
     Accepts:
         - A local file path to a server.json manifest
@@ -342,9 +560,9 @@ def lookup_ave(ave_id: str) -> str:
     """
     Get the full AVE record for a specific vulnerability ID.
 
-    Returns the complete record including title, description,
-    CVSS-AI score, behavioral fingerprint, indicators of compromise,
-    OWASP MCP mapping, NIST AI RMF mapping, and remediation steps.
+    Returns the complete record including title, description, AIVSS score,
+    behavioral fingerprint, indicators of compromise, OWASP MCP mapping,
+    and remediation steps.
 
     Args:
         ave_id: AVE ID in the format AVE-2026-NNNNN (e.g. AVE-2026-00001)
@@ -358,17 +576,19 @@ def lookup_ave(ave_id: str) -> str:
     if data.get("error"):
         return f"Error: {data['error']}"
 
+    aivss = data.get("aivss_score", data.get("cvss_ai_score", ""))
+
     lines = [
         f"{data.get('ave_id', '')}  {data.get('title', '')}",
-        f"Severity:     {data.get('severity', '')}  (CVSS-AI {data.get('cvss_ai_score', '')})",
+        f"Severity:     {data.get('severity', '')}  AIVSS {aivss}",
         f"Attack class: {data.get('attack_class', '')}",
         f"Component:    {data.get('component_type', '')}",
         f"Status:       {data.get('status', '')}",
         "",
-        f"Description:",
+        "Description:",
         f"  {data.get('description', '')}",
         "",
-        f"Behavioral fingerprint:",
+        "Behavioral fingerprint:",
         f"  {data.get('behavioral_fingerprint', '')}",
         "",
     ]
@@ -400,23 +620,22 @@ def lookup_ave(ave_id: str) -> str:
 
 
 @mcp.tool()
-def search_ave(
-    query: str,
-    limit: int = 10,
-) -> str:
+def search_ave(query: str, limit: int = 10) -> str:
     """
     Search AVE records by keyword.
 
     Searches across AVE ID, title, attack class, description, and
     behavioral fingerprint. Returns matching records with severity,
-    CVSS-AI score, and a link to the full record.
+    AIVSS score, and a link to the full record.
 
     Args:
         query: Search term (e.g. "tool poisoning", "credential", "MCP01")
-        limit: Maximum number of results to return (default 10, max 20)
+        limit: Maximum number of results (default 10, max 20)
     """
     limit = min(limit, 20)
-    data = _piranha_get(f"/records/search?q={urllib.parse.quote(query)}&limit={limit}")
+    data = _piranha_get(
+        f"/records/search?q={urllib.parse.quote(query)}&limit={limit}"
+    )
 
     if data.get("error"):
         return f"Error: {data['error']}"
@@ -433,9 +652,9 @@ def search_ave(
         ave_id = r.get("ave_id", "")
         title = r.get("title", "")
         severity = r.get("severity", "")
-        score = r.get("cvss_ai_score", 0)
+        aivss = r.get("aivss_score", r.get("cvss_ai_score", 0))
         owasp_mcp = ", ".join(r.get("owasp_mcp", []))
-        lines.append(f"[{severity} {score}] {ave_id}  {title}")
+        lines.append(f"[{severity} AIVSS {aivss}] {ave_id}  {title}")
         if owasp_mcp:
             lines.append(f"  OWASP MCP: {owasp_mcp}")
         lines.append(f"  {PIRANHA_API}/records/{ave_id}")
@@ -470,8 +689,7 @@ def list_ave(
         params.append(f"owasp_mcp={owasp_mcp.upper()}")
     params.append("limit=50")
 
-    qs = "&".join(params)
-    data = _piranha_get(f"/records?{qs}")
+    data = _piranha_get(f"/records?{'&'.join(params)}")
 
     if data.get("error"):
         return f"Error: {data['error']}"
@@ -488,9 +706,9 @@ def list_ave(
         ave_id = r.get("ave_id", "")
         title = r.get("title", "")
         severity_val = r.get("severity", "")
-        score = r.get("cvss_ai_score", 0)
+        aivss = r.get("aivss_score", r.get("cvss_ai_score", 0))
         owasp_mcp_val = ", ".join(r.get("owasp_mcp", []))
-        lines.append(f"[{severity_val} {score}] {ave_id}  {title}")
+        lines.append(f"[{severity_val} AIVSS {aivss}] {ave_id}  {title}")
         if owasp_mcp_val:
             lines.append(f"  OWASP MCP: {owasp_mcp_val}")
 
@@ -514,12 +732,17 @@ def check_pins(path: str = ".") -> str:
     Args:
         path: Directory to check (default: current directory)
     """
-    result = subprocess.run(  # nosec B603  # noqa: S603
-        ["bawbel", "check-pins", path, "--format", "json"],
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
+    try:
+        result = subprocess.run(  # nosec B603  # noqa: S603
+            ["bawbel", "check-pins", path, "--format", "json"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except subprocess.TimeoutExpired:
+        return "Error: pin check timed out"
+    except FileNotFoundError:
+        return "Error: bawbel CLI not found. Install with: pip install bawbel-scanner"
 
     raw = result.stdout.strip()
     if not raw:
@@ -538,15 +761,11 @@ def check_pins(path: str = ".") -> str:
 
     drifted = data.get("drifted", [])
     pinned = data.get("pinned_count", 0)
-    status = data.get("status", "")
 
     if not drifted:
         return f"Clean: all {pinned} pinned files match their stored hashes."
 
-    lines = [
-        f"DRIFT DETECTED: {len(drifted)} of {pinned} files changed",
-        "",
-    ]
+    lines = [f"DRIFT DETECTED: {len(drifted)} of {pinned} files changed", ""]
     for f in drifted:
         lines.append(f"  {f.get('file', '')}")
         lines.append(f"    Pinned:  {f.get('pinned_hash', '')[:16]}...")
@@ -582,7 +801,7 @@ def ave_stats() -> str:
         f"  LOW:      {by_sev.get('LOW', 0)}",
         "",
         f"API: {PIRANHA_API}",
-        f"AVE Standard: https://github.com/bawbel/bawbel-ave",
+        "AVE Standard: https://github.com/bawbel/bawbel-ave",
     ]
 
     registry = data.get("registry_scans", {})

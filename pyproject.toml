@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name        = "bawbel-mcp"
-version     = "1.0.1"
+version     = "1.1.0"
 description = "MCP server exposing Bawbel Scanner as agent-callable security tools"
 readme      = "README.md"
 license     = { text = "Apache-2.0" }
@@ -32,12 +32,12 @@ classifiers = [
 
 dependencies = [
     "fastmcp>=3.0.0",
-    "bawbel-scanner>=1.1.1",
+    "bawbel-scanner>=1.2.2",
 ]
 
 [project.optional-dependencies]
 all = [
-    "bawbel-scanner[all]>=1.1.1",
+    "bawbel-scanner[all]>=1.2.2",
 ]
 
 [project.urls]
