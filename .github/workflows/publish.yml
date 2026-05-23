@@ -31,7 +31,7 @@ jobs:
         run: pip install fastmcp bawbel-scanner pytest
 
       - name: Syntax check
-        run: python -m py_compile server.py && echo "Syntax OK"
+        run: python -m py_compile bawbel_mcp/server.py && echo "Syntax OK"
 
   # 2. Build
   build:
