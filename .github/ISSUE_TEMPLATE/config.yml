@@ -1,5 +1,9 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Report a vulnerability
+    url: https://github.com/bawbel/bawbel-mcp/security/advisories/new
+    about: >-
+      Report privately per SECURITY.md, never in a public issue.
   - name: Report a scanner detection problem
     url: https://github.com/bawbel/scanner/issues/new/choose
     about: >-

@@ -6,7 +6,8 @@ body:
   - type: markdown
     attributes:
       value: |
-        Do not report a security vulnerability in a public issue.
+        Do not report a security vulnerability in a public issue. Report it privately
+        per SECURITY.md.
 
   - type: input
     id: tool
