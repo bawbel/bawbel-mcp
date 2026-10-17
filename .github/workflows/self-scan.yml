@@ -1,0 +1,42 @@
+name: Self-scan
+
+on:
+  pull_request:
+  push:
+    branches: [develop, main]
+
+permissions:
+  contents: read
+
+jobs:
+  self-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+
+      - name: Install bawbel-scanner
+        run: pip install "bawbel-scanner[all]==1.3.0"
+
+      # The CLI exits non-zero on a scanner error, so a broken install fails this job.
+      - name: bawbel scan . --recursive
+        run: bawbel scan . --recursive --fail-on-severity high
+
+      - name: server.json versions match pyproject.toml
+        run: |
+          python3 - <<'EOF'
+          import json, sys, tomllib
+          want = tomllib.load(open("pyproject.toml", "rb"))["project"]["version"]
+          card = json.load(open("server.json"))
+          got = {"version": card["version"]}
+          for i, pkg in enumerate(card.get("packages", [])):
+              got[f"packages[{i}].version"] = pkg["version"]
+          print(f"pyproject.toml version: {want}")
+          bad = {k: v for k, v in got.items() if v != want}
+          for k, v in got.items():
+              print(f"server.json {k}: {v}{'  MISMATCH' if k in bad else ''}")
+          sys.exit(1 if bad else 0)
+          EOF

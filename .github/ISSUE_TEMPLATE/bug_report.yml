@@ -1,0 +1,50 @@
+name: Bug report
+description: A tool that fails, returns the wrong result, or does not match its docs.
+title: "bug: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not report a security vulnerability in a public issue.
+
+  - type: input
+    id: tool
+    attributes:
+      label: Tool
+      description: The MCP tool name, for example `scan_creds`.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The bawbel-mcp version, the bawbel-scanner version, and the MCP client.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: The tool call arguments and the client config. Redact secrets.
+      render: json
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual
+      description: The tool result or error.
+      render: text
+    validations:
+      required: true

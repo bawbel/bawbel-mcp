@@ -1,0 +1,10 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a scanner detection problem
+    url: https://github.com/bawbel/scanner/issues/new/choose
+    about: >-
+      A false positive or a missed finding comes from the scanner. File it in bawbel/scanner.
+  - name: Propose a new AVE record
+    url: https://github.com/bawbel/ave
+    about: >-
+      A new class of agentic vulnerability starts as an AVE record in bawbel/ave.
