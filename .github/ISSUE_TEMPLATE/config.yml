@@ -9,6 +9,7 @@ contact_links:
     about: >-
       A false positive or a missed finding comes from the scanner. File it in bawbel/scanner.
   - name: Propose a new AVE record
-    url: https://github.com/bawbel/ave
+    url: https://github.com/aveproject/ave
     about: >-
-      A new class of agentic vulnerability starts as an AVE record in bawbel/ave.
+      AVE is an independent project (aveproject/ave, aveproject.org@gmail.com). A new
+      class of agentic vulnerability starts as an AVE record there.
