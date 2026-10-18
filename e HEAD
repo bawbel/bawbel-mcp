@@ -1,0 +1,109 @@
+[33mcommit 52eac38397e30acdaf4b4a727d60679e0a03ed36[m[33m ([m[1;36mHEAD -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: Chak Saray <chaksaray@gmail.com>
+Date:   Sun May 24 00:40:53 2026 +0700
+
+    fix: new version v1.1.0 (#7)
+    
+    * release: v1.1.0 - accept_finding, scan_creds, scan_chain, no_ignore
+    
+    * chore: update readme with scan creds, chain, accept findings
+    
+    * fix: publish workflow
+    
+    * fix: pumb version 1.1.0
+
+[33mcommit d0b2272b139fec5a8a58b6355bb78c06edd994e3[m[33m ([m[1;33mtag: v1.1.0[m[33m)[m
+Author: Chak Saray <chaksaray@gmail.com>
+Date:   Sun May 24 00:26:51 2026 +0700
+
+    fix: publish workflow (#6)
+    
+    * release: v1.1.0 - accept_finding, scan_creds, scan_chain, no_ignore
+    
+    * chore: update readme with scan creds, chain, accept findings
+    
+    * fix: publish workflow
+
+[33mcommit a9a84b123fec4bfff01c591800ae6f85135754bf[m
+Author: Chak Saray <chaksaray@gmail.com>
+Date:   Sun May 24 00:08:26 2026 +0700
+
+    chore: update readme with scan creds, chain, accept findings (#5)
+
+[33mcommit afe0f8ec40e5778ec5016a1cd905d39a70be0253[m
+Author: Chak Saray <chaksaray@gmail.com>
+Date:   Sat May 23 23:45:33 2026 +0700
+
+    release: v1.1.0 - accept_finding, scan_creds, scan_chain, no_ignore (#4)
+
+[33mcommit 54e4c6cbe014791540226f61d1a12efe908e8082[m
+Merge: 9b88c47 d15cd42
+Author: Chak Saray <chaksaray@gmail.com>
+Date:   Sat May 23 23:20:05 2026 +0700
+
+    Merge pull request #2 from bawbel/develop
+    
+    feat: Accept findings, scan creds and chains, no_ignore audit mode
+
+[33mcommit d15cd420ca9939d6babd723dd3db2605851bed98[m
+Author: chaksaray <chaksaray@gmail.com>
+Date:   Sat May 23 23:18:53 2026 +0700
+
+    chore: add changelog for v1.1.0
+
+[33mcommit 9ca563827aa2e23eac5d4151c67fe4c4f17dae49[m
+Author: chaksaray <chaksaray@gmail.com>
+Date:   Sat May 23 23:09:21 2026 +0700
+
+    feat: scan creds, chain, accept finding
+
+[33mcommit 9b88c4715881811df1e27f0c52d9c80457189f30[m
+Author: chaksaray <chaksaray@gmail.com>
+Date:   Thu May 7 22:26:21 2026 +0700
+
+    chore: remove stale root server.py after package restructure
+
+[33mcommit 870327e7ca8ab0dfce55d1c389a9ea2468e8be39[m[33m ([m[1;33mtag: v1.0.1[m[33m)[m
+Merge: 0a710f1 11bb511
+Author: Chak Saray <chaksaray@gmail.com>
+Date:   Thu May 7 21:06:42 2026 +0700
+
+    Merge pull request #1 from bawbel/fix-mcp-entry-point
+    
+    fix: restructure as proper Python package for PyPI entry point
+
+[33mcommit 11bb511f790f793864204dbb9f16046a922718b2[m[33m ([m[1;31morigin/fix-mcp-entry-point[m[33m, [m[1;32mfix-mcp-entry-point[m[33m)[m
+Author: chaksaray <chaksaray@gmail.com>
+Date:   Thu May 7 21:04:17 2026 +0700
+
+    fix: restructure as proper Python package for PyPI entry point
+
+[33mcommit 0a710f1d9da0b1be6b2ad74efe43b485a0713de1[m
+Author: Chak Saray <chaksaray@gmail.com>
+Date:   Thu May 7 17:53:29 2026 +0700
+
+    feat: Add glama.json with schema and maintainers
+
+[33mcommit bed10f6a022cb743c1cdad7afcf1ea59089a95c1[m
+Author: chaksaray <chaksaray@gmail.com>
+Date:   Thu May 7 02:31:15 2026 +0700
+
+    fix: mcp server.json
+
+[33mcommit c403aa84e83998ab8816bd0a904459fc825ee31b[m[33m ([m[1;33mtag: v1.0.0[m[33m)[m
+Author: chaksaray <chaksaray@gmail.com>
+Date:   Thu May 7 02:01:55 2026 +0700
+
+    feat: add publish workflow
+
+[33mcommit e8484cc920539f34a7a71ebd9cd6c72248450d8f[m
+Author: chaksaray <chaksaray@gmail.com>
+Date:   Thu May 7 01:33:00 2026 +0700
+
+    feat: initial bawbel-mcp server v1.0.0
+
+[33mcommit 284a28c6c89a9f984395a2664c815a085aa9b99f[m
+Author: Chak Saray <chaksaray@gmail.com>
+Date:   Thu May 7 01:20:25 2026 +0700
+
+    Initial commit
