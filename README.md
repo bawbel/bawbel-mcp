@@ -51,7 +51,7 @@ pip install "bawbel-mcp[all]"
 
 | Resource | Description |
 |---|---|
-| `ave://stats` | Current AVE database statistics |
+| `ave://stats` | AVE record counts by severity, from the published AVE corpus |
 | `ave://record/{ave_id}` | Full AVE record for a specific ID |
 
 ---
@@ -167,6 +167,27 @@ suppression layers.
 
 ---
 
+## AVE data and configuration
+
+`lookup_ave` and `search_ave` query the AVE API first. When it is unavailable (5xx,
+timeout, or network error) they fall back to the published AVE corpus, which is fetched
+once and cached. `list_ave` and `ave://stats` use the cached corpus. Every reply ends with
+a `Source:` line, and names the fallback when one happened. Registry scan data came from
+PiranhaDB, which is offline, so `ave://stats` reports it as unavailable.
+
+| Variable | Default | Description |
+|---|---|---|
+| `BAWBEL_AVE_API_URL` | `https://api.aveproject.org` | AVE API: `/records/{id}`, `/search?q=` |
+| `BAWBEL_AVE_CORPUS_URL` | `https://raw.githubusercontent.com/aveproject/ave/main/dist/ave-records-latest.json` | Published AVE corpus |
+| `BAWBEL_AVE_CORPUS_TTL_SEC` | `3600` | How long the cached corpus is reused |
+| `BAWBEL_HTTP_TIMEOUT_SEC` | `10` | Timeout for every outbound request |
+| `BAWBEL_MAX_API_RESPONSE_BYTES` | `4194304` | Largest AVE JSON response accepted |
+
+URLs must be `http://` or `https://` with a plain host; integers must be positive. Any
+other value is ignored with a warning and the default is used.
+
+---
+
 ## Requirements
 
 - Python 3.10+
@@ -182,7 +203,7 @@ The `bawbel` CLI must be available in PATH. Installing `bawbel-mcp` installs
 
 - [bawbel-scanner](https://github.com/bawbel/scanner) - CLI scanner
 - [bawbel/ave](https://github.com/bawbel/ave) - AVE standard and records
-- [api.piranha.bawbel.io](https://api.piranha.bawbel.io) - Threat intel API
+- [aveproject/ave](https://github.com/aveproject/ave) - the AVE standard and records, an independent project
 - [bawbel.io/docs](https://bawbel.io/docs) - Full documentation
 
 ---

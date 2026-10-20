@@ -37,6 +37,8 @@ from typing import Optional
 
 from fastmcp import FastMCP
 
+from bawbel_mcp import ave_source, config
+
 mcp = FastMCP(
     name="Bawbel Scanner",
     instructions=(
@@ -49,8 +51,7 @@ mcp = FastMCP(
     ),
 )
 
-PIRANHA_API = "https://api.piranha.bawbel.io"
-MAX_CONTENT_BYTES = 100 * 1024  # 100KB
+LIST_LIMIT = 50  # list_ave shows at most this many records
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -111,28 +112,17 @@ def _fetch_url(url: str) -> tuple[Optional[str], Optional[str]]:
     try:
         req = urllib.request.Request(
             url,
-            headers={"User-Agent": "bawbel-mcp/1.1 (https://bawbel.io)"},
+            headers={"User-Agent": config.USER_AGENT},
         )
-        with urllib.request.urlopen(req, timeout=10) as r:  # nosec B310  # noqa: S310
-            return r.read(MAX_CONTENT_BYTES).decode("utf-8", errors="replace"), None
+        timeout = config.HTTP_TIMEOUT_SEC
+        with urllib.request.urlopen(req, timeout=timeout) as r:  # nosec B310  # noqa: S310
+            return r.read(config.MAX_CONTENT_BYTES).decode("utf-8", errors="replace"), None
     except urllib.error.HTTPError as e:
         return None, f"HTTP {e.code}: {e.reason}"
     except urllib.error.URLError as e:
         return None, f"URL error: {e.reason}"
     except Exception as e:  # noqa: BLE001
         return None, str(e)
-
-
-def _piranha_get(path: str) -> dict:
-    """GET from PiranhaDB API. Returns parsed JSON or error dict."""
-    url = f"{PIRANHA_API}{path}"
-    content, err = _fetch_url(url)
-    if err:
-        return {"error": f"PiranhaDB unavailable: {err}"}
-    try:
-        return json.loads(content)
-    except json.JSONDecodeError:
-        return {"error": "Invalid response from PiranhaDB"}
 
 
 def _format_finding(f: dict) -> list[str]:
@@ -154,7 +144,8 @@ def _format_finding(f: dict) -> list[str]:
         lines.append(f"  Engine: {engine}")
     if owasp_mcp:
         lines.append(f"  OWASP MCP: {owasp_mcp}")
-    lines.append(f"  Details: {PIRANHA_API}/records/{ave_id}")
+    if ave_id:
+        lines.append(f"  Details: {config.ave_record_url(ave_id)}")
     return lines
 
 
@@ -277,8 +268,8 @@ def scan_content(
     if not content or not content.strip():
         return "Error: content is empty"
 
-    if len(content.encode("utf-8")) > MAX_CONTENT_BYTES:
-        return f"Error: content exceeds {MAX_CONTENT_BYTES // 1024}KB limit"
+    if len(content.encode("utf-8")) > config.MAX_CONTENT_BYTES:
+        return f"Error: content exceeds {config.MAX_CONTENT_BYTES // 1024}KB limit"
 
     with tempfile.NamedTemporaryFile(
         mode="w", suffix=".md", prefix="bawbel_mcp_",
@@ -555,13 +546,31 @@ def check_conformance(url_or_path: str) -> str:
     return "\n".join(lines)
 
 
+def _source_line(res) -> str:
+    """Where the data came from, and why, when it was a fallback."""
+    if res.note:
+        return f"Source: {res.source} (fallback: {res.note})"
+    return f"Source: {res.source}"
+
+
+def _record_summary(r: dict) -> list[str]:
+    """One record as a list entry."""
+    ave_id = r.get("ave_id", "")
+    aivss = r.get("aivss_score", r.get("cvss_ai_score", 0))
+    lines = [f"[{r.get('severity', '')} AIVSS {aivss}] {ave_id}  {r.get('title', '')}"]
+    owasp_mcp = ", ".join(r.get("owasp_mcp") or [])
+    if owasp_mcp:
+        lines.append(f"  OWASP MCP: {owasp_mcp}")
+    return lines
+
+
 @mcp.tool()
 def lookup_ave(ave_id: str) -> str:
     """
     Get the full AVE record for a specific vulnerability ID.
 
     Returns the complete record including title, description, AIVSS score,
-    behavioral fingerprint, indicators of compromise, OWASP MCP mapping,
+    behavioral fingerprint, indicators of compromise, OWASP mapping,
     and remediation steps.
 
     Args:
@@ -571,10 +580,10 @@ def lookup_ave(ave_id: str) -> str:
     if not ave_id.startswith("AVE-"):
         return "Error: AVE ID must be in the format AVE-2026-NNNNN"
 
-    data = _piranha_get(f"/records/{ave_id}")
-
-    if data.get("error"):
-        return f"Error: {data['error']}"
+    res = ave_source.SOURCE.record(ave_id)
+    if res.error:
+        return f"Error: {res.error}"
+    data = res.data
 
     aivss = data.get("aivss_score", data.get("cvss_ai_score", ""))
 
@@ -593,8 +602,8 @@ def lookup_ave(ave_id: str) -> str:
         "",
     ]
 
-    owasp = data.get("owasp_mapping", [])
-    owasp_mcp = data.get("owasp_mcp", [])
+    owasp = data.get("owasp_asi") or data.get("owasp_mapping") or []
+    owasp_mcp = data.get("owasp_mcp") or []
     if owasp:
         lines.append(f"OWASP ASI:  {', '.join(owasp)}")
     if owasp_mcp:
@@ -606,7 +615,7 @@ def lookup_ave(ave_id: str) -> str:
         lines.append("Remediation:")
         lines.append(f"  {remediation}")
 
-    iocs = data.get("indicators_of_compromise", [])
+    iocs = data.get("indicators_of_compromise") or []
     if iocs:
         lines.append("")
         lines.append("Indicators of compromise:")
@@ -614,7 +623,8 @@ def lookup_ave(ave_id: str) -> str:
             lines.append(f"  - {ioc}")
 
     lines.append("")
-    lines.append(f"Full record: {PIRANHA_API}/records/{ave_id}")
+    lines.append(f"Full record: {config.ave_record_url(ave_id)}")
+    lines.append(_source_line(res))
 
     return "\n".join(lines)
 
@@ -632,33 +642,26 @@ def search_ave(query: str, limit: int = 10) -> str:
         query: Search term (e.g. "tool poisoning", "credential", "MCP01")
         limit: Maximum number of results (default 10, max 20)
     """
-    limit = min(limit, 20)
-    data = _piranha_get(
-        f"/records/search?q={urllib.parse.quote(query)}&limit={limit}"
-    )
+    query = query.strip()
+    if not query:
+        return "Error: query must not be empty"
+    limit = max(1, min(limit, 20))
 
-    if data.get("error"):
-        return f"Error: {data['error']}"
+    res = ave_source.SOURCE.search(query)
+    if res.error:
+        return f"Error: {res.error}"
 
-    records = data.get("records", [])
-    total = data.get("total", 0)
-
+    records = res.data
     if not records:
-        return f"No AVE records found for query: {query}"
+        return f"No AVE records found for query: {query}\n{_source_line(res)}"
 
-    lines = [f"Found {total} record(s) for '{query}' (showing {len(records)})", ""]
-
-    for r in records:
-        ave_id = r.get("ave_id", "")
-        title = r.get("title", "")
-        severity = r.get("severity", "")
-        aivss = r.get("aivss_score", r.get("cvss_ai_score", 0))
-        owasp_mcp = ", ".join(r.get("owasp_mcp", []))
-        lines.append(f"[{severity} AIVSS {aivss}] {ave_id}  {title}")
-        if owasp_mcp:
-            lines.append(f"  OWASP MCP: {owasp_mcp}")
-        lines.append(f"  {PIRANHA_API}/records/{ave_id}")
+    shown = records[:limit]
+    lines = [f"Found {len(records)} record(s) for '{query}' (showing {len(shown)})", ""]
+    for r in shown:
+        lines.extend(_record_summary(r))
+        lines.append(f"  {config.ave_record_url(r.get('ave_id', ''))}")
         lines.append("")
+    lines.append(_source_line(res))
 
     return "\n".join(lines)
 
@@ -677,43 +680,35 @@ def list_ave(
 
     Args:
         severity:       Filter by CRITICAL, HIGH, MEDIUM, or LOW
-        component_type: Filter by skill, mcp, prompt, or plugin
+        component_type: Filter by component type, e.g. skill, mcp (matches mcp_server),
+                        agent, tool
         owasp_mcp:      Filter by OWASP MCP category (e.g. MCP03, MCP05)
     """
-    params = []
+    res = ave_source.SOURCE.records()
+    if res.error:
+        return f"Error: {res.error}"
+
+    records = res.data
     if severity:
-        params.append(f"severity={severity.upper()}")
+        records = [r for r in records if str(r.get("severity", "")).upper() == severity.upper()]
     if component_type:
-        params.append(f"component_type={component_type.lower()}")
+        records = [
+            r for r in records if ave_source.matches_component(r.get("component_type"), component_type)
+        ]
     if owasp_mcp:
-        params.append(f"owasp_mcp={owasp_mcp.upper()}")
-    params.append("limit=50")
-
-    data = _piranha_get(f"/records?{'&'.join(params)}")
-
-    if data.get("error"):
-        return f"Error: {data['error']}"
-
-    records = data.get("records", [])
-    total = data.get("total", 0)
+        records = [r for r in records if owasp_mcp.upper() in (r.get("owasp_mcp") or [])]
 
     if not records:
-        return "No AVE records found with the given filters."
+        return f"No AVE records found with the given filters.\n{_source_line(res)}"
 
-    lines = [f"Showing {len(records)} of {total} AVE records", ""]
-
-    for r in records:
-        ave_id = r.get("ave_id", "")
-        title = r.get("title", "")
-        severity_val = r.get("severity", "")
-        aivss = r.get("aivss_score", r.get("cvss_ai_score", 0))
-        owasp_mcp_val = ", ".join(r.get("owasp_mcp", []))
-        lines.append(f"[{severity_val} AIVSS {aivss}] {ave_id}  {title}")
-        if owasp_mcp_val:
-            lines.append(f"  OWASP MCP: {owasp_mcp_val}")
+    shown = records[:LIST_LIMIT]
+    lines = [f"Showing {len(shown)} of {len(records)} AVE records", ""]
+    for r in shown:
+        lines.extend(_record_summary(r))
 
     lines.append("")
-    lines.append(f"Full database: {PIRANHA_API}/records")
+    lines.append(f"Full database: {config.AVE_PROJECT_URL}")
+    lines.append(_source_line(res))
 
     return "\n".join(lines)
 
@@ -785,34 +780,30 @@ def check_pins(path: str = ".") -> str:
 
 @mcp.resource("ave://stats")
 def ave_stats() -> str:
-    """Current AVE database statistics from PiranhaDB."""
-    data = _piranha_get("/stats/ecosystem")
-    if data.get("error"):
-        return f"Error: {data['error']}"
+    """AVE record counts by severity, from the published AVE corpus."""
+    res = ave_source.SOURCE.records()
+    if res.error:
+        return f"Error: {res.error}"
 
-    ave = data.get("ave_records", {})
-    by_sev = ave.get("by_severity", {})
+    by_sev: dict[str, int] = {}
+    for r in res.data:
+        sev = str(r.get("severity", "UNKNOWN")).upper()
+        by_sev[sev] = by_sev.get(sev, 0) + 1
 
-    lines = [
-        f"AVE Records: {ave.get('total', 0)}",
-        f"  CRITICAL: {by_sev.get('CRITICAL', 0)}",
-        f"  HIGH:     {by_sev.get('HIGH', 0)}",
-        f"  MEDIUM:   {by_sev.get('MEDIUM', 0)}",
-        f"  LOW:      {by_sev.get('LOW', 0)}",
-        "",
-        f"API: {PIRANHA_API}",
-        "AVE Standard: https://github.com/bawbel/bawbel-ave",
-    ]
-
-    registry = data.get("registry_scans", {})
-    if registry.get("total_servers_scanned"):
-        lines.append("")
-        lines.append(
-            f"Registry scans: {registry['total_servers_scanned']} servers scanned, "
-            f"{registry['total_findings']} findings"
-        )
-
-    return "\n".join(lines)
+    return "\n".join(
+        [
+            f"AVE Records: {len(res.data)}",
+            f"  CRITICAL: {by_sev.get('CRITICAL', 0)}",
+            f"  HIGH:     {by_sev.get('HIGH', 0)}",
+            f"  MEDIUM:   {by_sev.get('MEDIUM', 0)}",
+            f"  LOW:      {by_sev.get('LOW', 0)}",
+            "",
+            "Registry scan data: unavailable: PiranhaDB is offline",
+            "",
+            f"AVE Standard: {config.AVE_PROJECT_URL}",
+            _source_line(res),
+        ]
+    )
 
 
 @mcp.resource("ave://record/{ave_id}")
