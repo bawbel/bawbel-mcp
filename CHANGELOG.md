@@ -8,6 +8,22 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- AVE lookups use the AVE API (api.aveproject.org) and fall back to the published AVE
+  corpus when it is unavailable; list and stats use the cached corpus. Replies name their
+  source. api.piranha.bawbel.io no longer resolves (#20).
+- `search_ave` calls the API's `/search?q=` and applies the limit itself; `list_ave` filters
+  locally (`component_type` `mcp` matches `mcp_server`). `ave://stats` counts records by
+  severity and reports registry scan data as unavailable (#20).
+- Endpoints, timeouts, and limits live in `bawbel_mcp/config.py`, overridable from the
+  environment and validated. The User-Agent carries the package version (#20).
+
+### Fixed
+
+- AVE JSON responses are no longer cut at the 100 KB scan-content limit, which broke a full
+  record list; oversized responses fail with a message (#20).
+
 ---
 
 ## [1.1.0] - 2026-05-23
