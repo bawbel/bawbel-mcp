@@ -12,7 +12,7 @@ intelligence database mid-conversation.
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/bawbel-mcp.svg)](https://pypi.org/project/bawbel-mcp/)
 [![PyPI - Downloads](https://img.shields.io/pypi/dm/bawbel-mcp.svg)](https://pypi.org/project/bawbel-mcp/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![AVE Standard](https://img.shields.io/badge/AVE_Records-48-teal.svg)](https://github.com/bawbel/ave)
+[![AVE Standard](https://img.shields.io/badge/AVE-records-teal.svg)](https://github.com/bawbel/ave)
 [![MCP Compatible](https://img.shields.io/badge/MCP-compatible-blue.svg)](https://modelcontextprotocol.io)
 [![Powered by](https://img.shields.io/badge/powered_by-bawbel--scanner_v1.2.2-1B5E3F.svg)](https://github.com/bawbel/scanner)
 
