@@ -44,7 +44,7 @@ all = [
 Homepage       = "https://bawbel.io"
 Repository     = "https://github.com/bawbel/bawbel-mcp"
 Documentation  = "https://bawbel.io/docs"
-"Threat Intel" = "https://api.piranha.bawbel.io"
+"AVE Standard" = "https://aveproject.org"
 
 [project.scripts]
 bawbel-mcp = "bawbel_mcp.server:main"
