@@ -39,6 +39,9 @@ dependencies = [
 all = [
     "bawbel-scanner[all]>=1.2.2",
 ]
+dev = [
+    "pytest>=8.0.0",
+]
 
 [project.urls]
 Homepage       = "https://bawbel.io"
