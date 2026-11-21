@@ -14,7 +14,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.12"]
+        python-version: ["3.10", "3.11", "3.12"]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
@@ -25,6 +25,7 @@ jobs:
       - name: Install
         run: pip install -e ".[dev]"
 
-      # The tests mock every network call; none reaches the AVE API or the corpus.
+      # The tests mock every network call or use a loopback server; none reaches the AVE API
+      # or the corpus.
       - name: pytest
         run: python -m pytest tests/ -q
