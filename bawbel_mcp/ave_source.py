@@ -9,6 +9,7 @@ cannot filter. Every result says which source it came from.
 Nothing here raises to the caller: every failure comes back as an error string.
 """
 
+import http.client
 import json
 import threading
 import time
@@ -63,7 +64,9 @@ def http_get_json(url: str, max_bytes: int) -> tuple[Any, Optional[FetchError]]:
         return None, FetchError(f"HTTP {e.code}", e.code)
     except urllib.error.URLError as e:
         return None, FetchError(f"network error: {e.reason}")
-    except (TimeoutError, OSError) as e:
+    except (TimeoutError, OSError, http.client.HTTPException) as e:
+        # HTTPException (BadStatusLine, IncompleteRead) is not an OSError: a malformed reply
+        # from a broken proxy or server would otherwise escape and skip the corpus fallback.
         return None, FetchError(f"network error: {type(e).__name__}")
     if len(body) > max_bytes:
         return None, FetchError(f"response larger than {max_bytes} bytes")
