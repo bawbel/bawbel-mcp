@@ -79,7 +79,7 @@ AVE_PROJECT_URL = "https://github.com/aveproject/ave"
 
 HTTP_TIMEOUT_SEC = env_int("BAWBEL_HTTP_TIMEOUT_SEC", 10)
 AVE_CORPUS_TTL_SEC = env_int("BAWBEL_AVE_CORPUS_TTL_SEC", 3600)
-# JSON from the AVE API or corpus. The full corpus is about 0.7 MB (87 records, 2026-10).
+# JSON from the AVE API or corpus. The cap is well above the size of the full published corpus.
 MAX_API_RESPONSE_BYTES = env_int("BAWBEL_MAX_API_RESPONSE_BYTES", 4 * 1024 * 1024)
 # Content fetched for scanning (server cards).
 MAX_CONTENT_BYTES = 100 * 1024
